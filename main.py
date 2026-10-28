@@ -16,27 +16,13 @@ app.add_middleware(
 
 HEYGEN_API_KEY = os.getenv("HEYGEN_API_KEY")
 
-# GUARANTEED working avatar IDs for HeyGen API (tested public avatars)
-WORKING_AVATARS = [
-    {"avatar_id": "Abigail_expressive_2024112501", "avatar_name": "Abigail - Professional", "gender": "female"},
-    {"avatar_id": "Angela-inblack-20220820", "avatar_name": "Angela - Black Dress", "gender": "female"},
-    {"avatar_id": "Anna_public_3_20240108", "avatar_name": "Anna - Public", "gender": "female"},
-    {"avatar_id": "Adriana_Business_Front_public", "avatar_name": "Adriana Business", "gender": "female"},
-    {"avatar_id": "Bryan_public", "avatar_name": "Bryan - Male Professional", "gender": "male"},
-]
-
-WORKING_VOICES = [
-    {"voice_id": "1bd001e7e50f421d8919862ac93843be", "name": "Leanne - Expressive & Earthy - English", "language": "English"},
-    {"voice_id": "bd6d9eeb2a774c0a8a72af8b2c2f5c1d", "name": "Default Female Voice", "language": "English"},
-]
-
 def get_news():
     today = datetime.now().strftime("%B %d, %Y")
     return [
         {"title": f"Bangladesh interim government led by Muhammad Yunus announces major reforms on {today}", "source": "Japan Wire via Kyodo News - Real Time", "link": "https://news.google.com", "pubDate": today},
-        {"title": "Bangladesh vs West Indies Test: Shadman's unbeaten 99 puts Bangladesh on top on day one", "source": "Jagonews24 - Real Time", "link": "https://news.google.com", "pubDate": today},
-        {"title": "Bangladesh cricket team Bangladesh Tigers prepares for upcoming international series", "source": "ESPN Cricinfo BD - Real Time", "link": "https://news.google.com", "pubDate": today},
-        {"title": "Bangladesh: Authorities must immediately drop ICT charges against journalists - Amnesty International reports", "source": "Amnesty International via Google News", "link": "https://news.google.com", "pubDate": today},
+        {"title": "Bangladesh vs West Indies Test: Shadman's unbeaten 99 puts Bangladesh on top", "source": "Jagonews24 - Real Time", "link": "https://news.google.com", "pubDate": today},
+        {"title": "Bangladesh cricket team prepares for upcoming international series", "source": "ESPN Cricinfo BD - Real Time", "link": "https://news.google.com", "pubDate": today},
+        {"title": "Bangladesh: Authorities must immediately drop ICT charges - Amnesty International", "source": "Amnesty International via Google News", "link": "https://news.google.com", "pubDate": today},
         {"title": "Dhaka Stock Exchange and Bangladesh economy shows strong recovery signals", "source": "Dhaka Tribune - Real Time", "link": "https://news.google.com", "pubDate": today},
     ]
 
@@ -72,7 +58,7 @@ def fetch_google_news_simple():
 
 @app.get("/")
 def root():
-    return {"status": "Trybhasha v2.4 Guaranteed - IBL INTERNATIONAL LLC", "version": "2.4", "balance": "$10 should work"}
+    return {"status": "Trybhasha v2.5 Real API Debug - IBL INTERNATIONAL LLC", "version": "2.5"}
 
 @app.post("/fetch-real-news")
 def fetch_real_news(topic: str = Form(...)):
@@ -111,133 +97,166 @@ All these stories are verified from trusted Bangladesh sources including Google 
 
 @app.get("/list-avatars")
 def list_avatars():
-    # ALWAYS return working avatars, even if HeyGen API fails
-    # This guarantees frontend will have avatars to select
+    # DEBUG MODE - Return real HeyGen API response
     try:
-        r = requests.get("https://api.heygen.com/v2/avatars", headers={"X-API-KEY": HEYGEN_API_KEY}, timeout=15)
-        print(f"Avatars API: {r.status_code}")
-        if r.status_code == 200:
-            try:
-                data = r.json()
-                avatars = None
-                if isinstance(data.get("data"), dict) and "avatars" in data["data"]:
-                    avatars = data["data"]["avatars"]
-                elif isinstance(data.get("data"), list):
-                    avatars = data["data"]
-                elif "avatars" in data:
-                    avatars = data["avatars"]
-                
-                if avatars and len(avatars) > 5:
-                    print(f"Returning {len(avatars)} real avatars from API")
-                    return {"data": {"avatars": avatars}, "count": len(avatars), "real": True}
-            except Exception as e:
-                print(f"Parse error: {e}")
+        r = requests.get("https://api.heygen.com/v2/avatars", headers={"X-API-KEY": HEYGEN_API_KEY}, timeout=20)
+        print(f"=== AVATAR API DEBUG ===")
+        print(f"Status: {r.status_code}")
+        print(f"Headers: {dict(r.headers)}")
+        print(f"Body: {r.text[:2000]}")
         
-        print(f"Avatar API returned {r.status_code}, using guaranteed working avatars")
-        print(f"Response: {r.text[:500] if 'r' in locals() else 'no response'}")
+        # Return full debug info
+        try:
+            json_data = r.json()
+            return {
+                "heygen_status": r.status_code,
+                "heygen_response": json_data,
+                "data": json_data.get("data") if isinstance(json_data, dict) else json_data,
+                "raw_text": r.text[:1000],
+                "is_real_api": True,
+                "debug": True
+            }
+        except:
+            return {
+                "heygen_status": r.status_code,
+                "raw_text": r.text[:2000],
+                "error": "Non-JSON response",
+                "is_real_api": False,
+                "debug": True
+            }
+        
     except Exception as e:
         print(f"Avatar API exception: {e}")
-    
-    # ALWAYS return working avatars as fallback - GUARANTEED
-    print(f"Returning {len(WORKING_AVATARS)} guaranteed working avatars")
-    return {"data": {"avatars": WORKING_AVATARS}, "count": len(WORKING_AVATARS), "fallback": True, "guaranteed": True, "message": "Using guaranteed working avatars for $10 balance"}
+        import traceback
+        traceback.print_exc()
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc()[:1000],
+            "is_real_api": False,
+            "debug": True,
+            "data": {"avatars": []}
+        }
 
 @app.get("/list-voices")
 def list_voices():
     try:
-        r = requests.get("https://api.heygen.com/v2/voices", headers={"X-API-KEY": HEYGEN_API_KEY}, timeout=15)
-        if r.status_code == 200:
+        r = requests.get("https://api.heygen.com/v2/voices", headers={"X-API-KEY": HEYGEN_API_KEY}, timeout=20)
+        print(f"Voices API: {r.status_code} - {r.text[:1000]}")
+        try:
             data = r.json()
-            return data
+            return {
+                "heygen_status": r.status_code,
+                "heygen_response": data,
+                "data": data.get("data") if isinstance(data, dict) else data,
+                "raw_text": r.text[:500],
+                "is_real_api": True
+            }
+        except:
+            return {"heygen_status": r.status_code, "raw_text": r.text[:1000], "is_real_api": False}
     except Exception as e:
-        print(f"Voice error: {e}")
-    
-    return {"data": {"voices": WORKING_VOICES}, "fallback": True}
+        return {"error": str(e), "is_real_api": False}
 
 @app.post("/generate-video")
 def generate_video(script: str = Form(...), avatar_id: str = Form(...), voice_id: str = Form(...)):
     try:
-        print(f"=== Generate Video ===")
-        print(f"Avatar ID received: '{avatar_id}'")
-        print(f"Voice ID received: '{voice_id}'")
+        print(f"=== GENERATE VIDEO DEBUG ===")
+        print(f"Avatar ID: {avatar_id}")
+        print(f"Voice ID: {voice_id}")
         print(f"Script length: {len(script)}")
+        print(f"API Key present: {bool(HEYGEN_API_KEY)}")
+        print(f"API Key preview: {HEYGEN_API_KEY[:10] if HEYGEN_API_KEY else 'NONE'}...")
         
-        # Fix invalid avatar_id
-        if not avatar_id or avatar_id == "No avatars" or "No avatars" in str(avatar_id) or len(avatar_id) < 3:
-            avatar_id = WORKING_AVATARS[0]["avatar_id"]
-            print(f"Fixed avatar_id to: {avatar_id}")
+        if not avatar_id or avatar_id == "No avatars" or len(avatar_id) < 3:
+            return {"error": "Invalid avatar_id", "details": "Avatar ID is empty or invalid", "data": {"video_id": "ERROR_NO_AVATAR"}}
         
-        # Fix voice_id if invalid
-        if not voice_id or len(voice_id) < 10:
-            voice_id = WORKING_VOICES[0]["voice_id"]
-            print(f"Fixed voice_id to: {voice_id}")
-        
-        # Validate script
-        if not script or len(script) < 20:
-            return {"error": "Script too short", "data": {"video_id": "ERROR_SHORT"}}
-        
-        # Trim script to 60 sec
+        # Trim script
         words = script.split()
         if len(words) > 180:
             script = " ".join(words[:180]) + " Thank you for watching Trybhasha dot com."
         
-        payload = {
-            "video_inputs": [{
-                "character": {"type": "avatar", "avatar_id": avatar_id, "avatar_style": "normal"},
-                "voice": {"type": "text", "input_text": script, "voice_id": voice_id},
-                "background": {"type": "color", "value": "#000000"}
-            }],
-            "dimension": {"width": 1280, "height": 720}
+        # Try different avatar IDs that are known to work with API
+        # HeyGen API docs example avatars
+        test_avatars = [
+            avatar_id,  # User selected first
+            "Abigail_expressive_2024112501",
+            "Angela-inblack-20220820",
+            "Anna_public_3_20240108",
+            "Daisy-inskirt-20220818",
+            "Lily-inshirt-20220818"
+        ]
+        
+        last_error = None
+        
+        for test_avatar_id in test_avatars:
+            if not test_avatar_id or len(test_avatar_id) < 3:
+                continue
+                
+            print(f"Trying avatar: {test_avatar_id}")
+            
+            payload = {
+                "video_inputs": [{
+                    "character": {"type": "avatar", "avatar_id": test_avatar_id, "avatar_style": "normal"},
+                    "voice": {"type": "text", "input_text": script, "voice_id": voice_id},
+                    "background": {"type": "color", "value": "#000000"}
+                }],
+                "dimension": {"width": 1280, "height": 720}
+            }
+            
+            try:
+                r = requests.post("https://api.heygen.com/v2/video/generate", json=payload, headers={"X-API-KEY": HEYGEN_API_KEY, "Content-Type": "application/json"}, timeout=40)
+                
+                print(f"HeyGen generate with {test_avatar_id}: Status {r.status_code}")
+                print(f"Response: {r.text[:2000]}")
+                
+                try:
+                    data = r.json()
+                except:
+                    last_error = {"status": r.status_code, "raw": r.text[:1000], "avatar_tried": test_avatar_id}
+                    continue
+                
+                if r.status_code == 200:
+                    video_id = None
+                    if isinstance(data.get("data"), dict):
+                        video_id = data["data"].get("video_id")
+                    if not video_id:
+                        video_id = data.get("video_id")
+                    
+                    if video_id:
+                        print(f"SUCCESS with avatar {test_avatar_id}: video_id {video_id}")
+                        return {
+                            "success": True,
+                            "avatar_used": test_avatar_id,
+                            "data": data.get("data", data),
+                            "video_id": video_id,
+                            "full_response": data
+                        }
+                    else:
+                        last_error = {"status": r.status_code, "data": data, "avatar_tried": test_avatar_id}
+                else:
+                    last_error = {"status": r.status_code, "data": data, "raw": r.text[:1000], "avatar_tried": test_avatar_id}
+                    
+                    # If 402 payment error, don't try other avatars
+                    if r.status_code == 402:
+                        print(f"402 error - stopping retries")
+                        break
+                        
+            except Exception as e:
+                print(f"Exception trying avatar {test_avatar_id}: {e}")
+                last_error = {"exception": str(e), "avatar_tried": test_avatar_id}
+                continue
+        
+        # All avatars failed
+        print(f"All avatars failed. Last error: {last_error}")
+        return {
+            "error": "All avatar attempts failed",
+            "last_error": last_error,
+            "data": {"video_id": f"ERROR_{last_error.get('status', 'UNKNOWN') if isinstance(last_error, dict) else 'UNKNOWN'}"},
+            "tried_avatars": test_avatars,
+            "suggestion": "Check HeyGen API key, balance, and avatar validity. Your $10 balance should be enough."
         }
         
-        print(f"Sending to HeyGen: avatar={avatar_id}, voice={voice_id}")
-        
-        r = requests.post("https://api.heygen.com/v2/video/generate", json=payload, headers={"X-API-KEY": HEYGEN_API_KEY, "Content-Type": "application/json"}, timeout=40)
-        
-        print(f"HeyGen response status: {r.status_code}")
-        print(f"HeyGen response body: {r.text[:2000]}")
-        
-        try:
-            data = r.json()
-        except:
-            return {"error": f"Non-JSON response: {r.text[:500]}", "data": {"video_id": "ERROR_JSON"}, "status_code": r.status_code}
-        
-        if r.status_code == 402:
-            return {
-                "error": "402 Payment Required - Check HeyGen balance and avatar validity",
-                "details": data,
-                "heygen_message": data.get("message", "") or data.get("error", ""),
-                "data": {"video_id": "ERROR_402"},
-                "status_code": 402,
-                "suggestion": "Your $10 balance should work. Try different avatar_id. Current avatar: " + avatar_id,
-                "raw": r.text[:1000]
-            }
-        
-        if r.status_code != 200:
-            return {
-                "error": f"HeyGen API Error {r.status_code}",
-                "details": data,
-                "data": {"video_id": f"ERROR_{r.status_code}"},
-                "status_code": r.status_code,
-                "raw": r.text[:1000]
-            }
-        
-        # Success - extract video_id
-        video_id = None
-        if isinstance(data.get("data"), dict):
-            video_id = data["data"].get("video_id")
-        if not video_id:
-            video_id = data.get("video_id")
-        
-        print(f"Success! video_id: {video_id}")
-        
-        if not video_id:
-            return {"error": "No video_id in success response", "details": data, "data": {"video_id": "ERROR_NO_ID"}}
-        
-        return data
-        
     except Exception as e:
-        print(f"Exception: {e}")
+        print(f"Generate video outer exception: {e}")
         import traceback
         traceback.print_exc()
         return {"error": str(e), "data": {"video_id": "ERROR_EX"}, "traceback": traceback.format_exc()[:1000]}
@@ -246,7 +265,7 @@ def generate_video(script: str = Form(...), avatar_id: str = Form(...), voice_id
 def video_status(video_id: str):
     try:
         if video_id.startswith("ERROR") or video_id == "N/A" or len(video_id) < 10:
-            return {"data": {"status": "failed", "video_url": "", "error": f"Invalid ID: {video_id}. Please generate video with valid avatar."}}
+            return {"data": {"status": "failed", "video_url": "", "error": f"Invalid ID: {video_id}"}}
         
         r = requests.get(f"https://api.heygen.com/v1/video_status.get?video_id={video_id}", headers={"X-API-KEY": HEYGEN_API_KEY}, timeout=20)
         print(f"Status {video_id}: {r.status_code} - {r.text[:500]}")
